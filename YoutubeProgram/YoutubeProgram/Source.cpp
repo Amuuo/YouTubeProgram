@@ -88,6 +88,7 @@ int main(int argc, char** argv)
 	std::string               vid      = "-video";
 	std::string               play     = "-playlist";
 	std::string               log      = " > logFile.txt";
+	std::string               cmd;
 	char                      response = 'q';
 	char                      check;
 
@@ -146,7 +147,7 @@ int main(int argc, char** argv)
 		if (sameVid == false) {
 			if (selection == 'v' || selection == 'V') {
 				videos[0].url   = firstUrl;
-				std::string cmd = vCmdA + firstUrl;
+				cmd = vCmdA + firstUrl;
 				system((const char*)cmd.c_str());
 				cmd = vCmdE + firstUrl;
 				system((const char*)cmd.c_str());
@@ -197,7 +198,10 @@ int main(int argc, char** argv)
 		else sameVid = false;
 	} while (response == 'y' || response == 'Y');
 
-	system("PAUSE");
+	for (Video& vid : videos) {
+		cmd = "rm \"" + vid.filename + "\"";
+		system((const char*)cmd.c_str());
+	}
 	return 0;
 }
 //////////////////////////////////////////////////////////////////////////////////
