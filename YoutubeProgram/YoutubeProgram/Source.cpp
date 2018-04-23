@@ -14,6 +14,7 @@
 #include<utility>
 #include<map>
 #include<cmath>
+#include<exception>
 
 //////////////////////////////////////////////////////////////////////////////////
 // VIDEO
@@ -62,7 +63,7 @@ void exportTimestamps        (std::vector<Video>&                           );
 void redrawLoading           (                                              );
 void cleanupFiles            (std::vector<Video>&                           );
 void getFileNames            (std::vector<Video>&, std::string              );
-void launchUrls              (std::vector<Video>&, std::vector<std::string> );
+void launchUrls              (std::vector<Video>&, std::vector<std::string>&);
 void saveToClip              (std::set<std::string>&                        );
 void getClips                (Video&, int                                   );
 void getTime                 (std::vector<std::string>&, std::vector<Video>&);
@@ -156,7 +157,7 @@ int main(int argc, char** argv)
 			}
 			if (selection == 'S' || selection == 's') {				
 				system((const char*)sCmdA.c_str());
-				system((const char*)sCmdE.c_str());
+				//system((const char*)sCmdE.c_str());
 			}
 			if (sameVid == false)
 				cleanupFiles(videos);
@@ -226,8 +227,12 @@ void getFileNames(std::vector<Video>& vids, std::string fileCommand)
 	//INITIALIZE VIDEO CLASSES
 	int itmp = 0;
 	do {
-		getline(inFile, tmp);
-
+		getline(inFile, tmp, '\n');
+		Video v;
+		v.title = tmp;
+		getline(inFile, tmp, '\n');
+		v.id = tmp;
+		getline(inFile, tmp, '\n');
 		//getline(urlFile, utmp);
 		std::istringstream iss(tmp);
 		char c;
@@ -246,12 +251,9 @@ void getFileNames(std::vector<Video>& vids, std::string fileCommand)
 		ttmp = tmp;
 		tmp += ".en.vtt";
 		std::cout << "tmp: " << tmp;
-		Video v(ttmp, tmp, utmp);
+		v.filename = tmp;
 		vids.push_back(v);
-		getline(inFile, tmp);
-		v.title = tmp;
-		getline(inFile, tmp);
-		v.id = tmp;
+
 
 	} while (inFile.peek() != EOF);
 
@@ -290,30 +292,33 @@ void getTime(std::vector<std::string>& keys, std::vector<Video>& vids) {
 	std::string    currentWord;
 
 	if (sameVid == false) {
-		s = '0';
-		inFile.open(vids[0].filename);
-		if (inFile.fail()) {
-			std::cout << "\n\tCouldn't open file in getTime function";
-			system("PAUSE");
-			exit(1);
-		}
-		while (inFile.good()) {
-			getline(inFile, temp);
-			while (inFile.peek() != EOF) {
-				std::transform(temp.begin(), temp.end(), temp.begin(), ::tolower);
-				vids[0].lines.push_back(temp);
-				getline(inFile, temp);
+		for (Video& vid : vids) {
+			s = '0';
+			inFile.open(vid.filename);
+			if (inFile.fail()) {
+				std::cout << "\n\tCouldn't open file in getTime function";
+				system("PAUSE");
+				exit(1);
 			}
-		} inFile.close();
+			while (inFile.good()) {
+				getline(inFile, temp);
+				while (inFile.peek() != EOF) {
+					getline(inFile, temp);
+					std::transform(temp.begin(), temp.end(), temp.begin(), ::tolower);
+					vid.lines.push_back(temp);
+				}				
+			} 
+			inFile.close();
+			inFile.clear();
+		}
 	}
 	//iterate through lines between '\n's
-	short i = 0;
-	for(auto& vid : vids){
+	int i = 0;
+	for(Video& vid : vids){
 		for (std::string& line : vid.lines) {
+			std::istringstream iss(line);
 			//iterate through keywords
 			//parse look lines look for keywords
-			std::istringstream iss(line);
-
 			while (iss) {
 				iss >> currentWord;
 
@@ -335,7 +340,7 @@ void getTime(std::vector<std::string>& keys, std::vector<Video>& vids) {
 							getClips(vid, i - 1);
 					}
 					catch (std::exception& e) { continue; }
-				}
+				}				
 			} ++i;
 		}
 	} return;
@@ -345,6 +350,7 @@ void getClips(Video& vid, int line) {
 	short hr = 0;
 	short min = 0;
 	short sec = 0;
+	std::string name;
 
 	//calculate timestamp
 	try {
@@ -367,9 +373,14 @@ void getClips(Video& vid, int line) {
 		--min;
 		sec = 60 + (sec - mention);
 	}
-	std::string name = vid.url + "&feature=youtu.be&t=" + std::to_string(hr) + 'h'
-		+ std::to_string(min) + 'm' + std::to_string(sec - mention) + 's';
-
+	if (selection == 'v' || selection == 'V') {
+		name = vid.url + "&feature=youtu.be&t=" + std::to_string(hr) + 'h'
+			+ std::to_string(min) + 'm' + std::to_string(sec - mention) + 's';
+	}
+	if (selection == 's' || selection == 'S') {
+		name = "https://youtu.be/" + vid.id + "?t=" + std::to_string(hr) + 'h'
+			+ std::to_string(min) + 'm' + std::to_string(sec - mention) + 's';;
+	}
 	// skip if new file is within 5 seconds of another clip
 	int seconds = (min * 60) + (sec - mention);
 	for (auto &c : vid.clipSecondMark) {
@@ -382,61 +393,58 @@ void getClips(Video& vid, int line) {
 	return;
 }
 //////////////////////////////////////////////////////////////////////////////////
-void launchUrls(std::vector<Video>& vids, std::vector<std::string> key) {
+void launchUrls(std::vector<Video>& vids, std::vector<std::string>& key) {
 	
 	int matchSize = 0;
+	std::string newFile;
 	for (auto& vid : vids) {
 		matchSize += vid.clips.size();
 	}
-	std::cout << "\n\n\"" << key[0] << "\" mentioned " << matchSize << " across all videos";
+	redraw();
+	std::cout << "\n\n\t\"" << key[0] << "\" is mentioned " << matchSize << " across all videos";
 	Sleep(3000);
 
 	for (Video& vid : vids) {
-		if (vid.clips.size() == 0) {
-			std::cout << "\n\n\tCouldn't find any mentions of "
-				<< key[0] << " in this video...";
-			return;
-		}
-		std::string newFile;
-		short  switc = 1;
-		short i = 1;
-		char  response = 'q';
-		std::cout << "\n\n";
-		screen += "\t\"" + key[0] + "\" is mentioned: "
-			+ std::to_string(vid.clips.size()) + " times.";
-		if (sameVid == true) screen += "\n";
-		redraw(screen);
-		std::cout << "\n\n\tPress ENTER to launch first video...";
-		_getch();
+		if (vid.clips.size() != 0) {
+			short  switc = 1;
+			short i = 1;
+			char  response = 'q';
+			std::cout << "\n\n";
+			screen += "\t\"" + key[0] + "\" is mentioned: "
+				+ std::to_string(vid.clips.size()) + " times.";
+			if (sameVid == true) screen += "\n";
+			redraw(screen);
+			std::cout << "\n\n\tPress ENTER to launch first video from " << vid.title;
+			_getch();
 
-		if (sameVid == false) {
-			screen += "\n\n\t    'S' -- skip"
-					    "\n\t    'C' -- cancel"
-				        "\n\t    'A' -- save all to clipboard"
-				        "\n\t    'P' -- print timestamps (in seconds) to file"
-				        "\n\t'SPACE' -- next\n";
-		}
-		redraw(screen);
-
-		for (std::string s : vid.clips) {
-			if (i > 1) response = _getch();
-			if (response == 'a' || response == 'A') {
-				saveToClip(vid.clips);
-				screen += "\n\tURL List saved to clipboard";
-				redraw(screen);
-				response = _getch();
+			if (sameVid == false) {
+				screen += "\n\n\t    'S' -- skip"
+					"\n\t    'C' -- cancel"
+					"\n\t    'A' -- save all to clipboard"
+					"\n\t    'P' -- print timestamps (in seconds) to file"
+					"\n\t'SPACE' -- next\n";
 			}
+			redraw(screen);
 
-			if (response == 's' || response == 'S')
-				switc = 0;
-			if (response == 'c' || response == 'C')
-				return;
-			if (response == 'a' || response == 'A')
-				continue;
-			if (response == 'p' || response == 'P')
-				exportTimestamps(vids);
+			for (const auto& s : vid.clips) {
+				if (i > 1) response = _getch();
+				if (response == 'a' || response == 'A') {
+					saveToClip(vid.clips);
+					screen += "\n\tURL List saved to clipboard";
+					redraw(screen);
+					response = _getch();
+				}
 
-			switch (switc) {
+				if (response == 's' || response == 'S')
+					switc = 0;
+				if (response == 'c' || response == 'C')
+					return;
+				if (response == 'a' || response == 'A')
+					continue;
+				if (response == 'p' || response == 'P')
+					exportTimestamps(vids);
+
+				switch (switc) {
 				case 0:
 					screen += "\n\tSKIPPING VIDEO " + std::to_string(i) + "/" + std::to_string(vid.clips.size());
 					redraw(screen);
@@ -453,9 +461,15 @@ void launchUrls(std::vector<Video>& vids, std::vector<std::string> key) {
 					switc = 1;
 					--i;
 					break;
-			} ++i;
+				} ++i;
+			}
 		}
-	} return;
+		else {
+			std::cout << "\n\n\tCouldn't find any mentions of "
+				<< key[0] << " in this video...";
+		}
+	} 
+	return;
 }
 //////////////////////////////////////////////////////////////////////////////////
 std::string getFileContents(std::string fileName) {
