@@ -405,13 +405,13 @@ void launchUrls(std::vector<Video>& vids, std::vector<std::string>& key) {
 	for (Video& vid : vids) {
 		if (vid.clips.size() != 0) {
 			screen = "";
-			screen += ">> \"" + key[0] + "\" is mentioned " + std::to_string(matchSize) + " times across all videos";
+			screen += "\t\"" + key[0] + "\" is mentioned " + std::to_string(matchSize) + " times across all videos";
 			short  switc = 1;
 			short i = 1;
 			char  response = 'q';
 			std::cout << "\n\n";
-			screen += "\n\t>> " + vid.title;
-			screen += "\n\t>> \"" + key[0] + "\" is mentioned "
+			screen += "\t" + vid.title;
+			screen += "\n\t\"" + key[0] + "\" is mentioned "
 				+ std::to_string(vid.clips.size()) + " times";
 			if (sameVid == false) {
 				screen += "\n\n\t    'S' -- skip"
